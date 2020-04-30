@@ -9,9 +9,9 @@ using Object = UnityEngine.Object;
 /// </summary>
 public class ResourceManager : Singleton<ResourceManager>
 {
-    public AssetBundleManifest manifest;
+    AssetBundleManifest m_manifest;
 
-    IAssetLoader loader;
+    IAssetLoader m_loader;
 
     Dictionary<string, ITask> task_dic = new Dictionary<string, ITask>();
 
@@ -21,21 +21,71 @@ public class ResourceManager : Singleton<ResourceManager>
     //资源加载完成回掉
     Dictionary<string, Action<Object>> m_load_callback = new Dictionary<string, Action<Object>>();
 
+
+    public void Setup(AssetBundleManifest mainfest, IAssetLoader loader)
+    {
+        m_manifest = mainfest;
+        m_loader = loader;
+    }
+
     public void GetObject<T>(string path, Action<T> load_callback) where T : Object
     {
+        var cb = load_callback as Action<Object>;
         if (m_all_assets.ContainsKey(path))
         {
             var unit = m_all_assets[path];
-            load_callback.Invoke(unit.GetObject<T>());
+            if (unit.status == EResourceUnitStatus.Done)
+            {
+                load_callback.Invoke(unit.GetObject<T>());
+            }
+            else  
+            {
+                if (unit.status == EResourceUnitStatus.Unload)
+                {
+                    loader.LoadAsset(path);
+
+                }
+                m_load_callback.Add(path, cb);
+            }
         }
         else
         {
             loader.LoadAsset(path);
-            m_load_callback.Add(path, load_callback as Action<Object>);
+            m_load_callback.Add(path, cb);
+            CreatResourceUnit(path);
         }
     }
 
-    public ITask CreatTask(string path, Action<Object> finish_cb)
+    private ResourceUnit CreatResourceUnit(string path)
+    {
+        var dependencies = manifest.GetAllDependencies(path);
+        var length = dependencies.Length;
+        var units = new ResourceUnit[length];
+        for (int i = 0; i < length; i++)
+        {
+            units[i] = CreatResourceUnit(dependencies[i]);
+        }
+        var unit = new ResourceUnit(units);
+        m_all_assets.Add(path, unit);
+        return unit;
+    }
+
+    void OnLoadFinish(string path,Object obj)
+    {
+        if (obj is AssetBundle)
+        {
+            var ab = obj as AssetBundle;
+            var assets = ab.LoadAllAssets();
+            m_all_assets[path].Finish(assets.Length == 1 ?  assets[0] : null);
+        }
+        else
+        {
+            m_load_callback[path].Invoke(obj);
+            m_load_callback.Remove(path);
+        }
+    }
+
+    public ITask CreatTask(string path, Action<string, Object> finish_cb)
     {
         var dependencies = manifest.GetAllDependencies(path);
         var length = dependencies.Length;
@@ -49,7 +99,7 @@ public class ResourceManager : Singleton<ResourceManager>
             }
             else
             {
-                var tsk = CreatTask(path, finish_cb);
+                var tsk = CreatTask(ab_path, finish_cb);
                 tasks[i] = tsk;
             }
         }
@@ -73,7 +123,7 @@ public class ResourceManager : Singleton<ResourceManager>
 
         public object Current { get; }
         public bool finished { get; set; }
-        public Action<Object> Finish_CB { get; set; }
+        public Action<string, Object> Finish_CB { get; set; }
 
         public TaskLink(ITask task)
         {
@@ -116,7 +166,7 @@ public class ResourceManager : Singleton<ResourceManager>
 
         IEnumerator current;
         public object Current { get => current; }
-        public Action<Object> Finish_CB { get; set;}
+        public Action<string, Object> Finish_CB { get; set;}
 
         public IEnumerator Execute()
         {
@@ -130,7 +180,7 @@ public class ResourceManager : Singleton<ResourceManager>
         {
            if (m_subTask != null && m_subTask.Length > index)
             {
-                current = m_subTask[index];
+                current = m_subTask[index++];
                 return true;
             }
            if (!finished)
@@ -138,7 +188,7 @@ public class ResourceManager : Singleton<ResourceManager>
                 current = Execute();
                 return true;
             }
-            Finish_CB(m_ab);
+            Finish_CB(m_path, m_ab);
             return false;
         }
 
@@ -152,6 +202,6 @@ public class ResourceManager : Singleton<ResourceManager>
     public interface ITask : IEnumerator
     {
         bool finished { get; set; }
-        Action<Object> Finish_CB { get; set; }
+        Action<string, Object> Finish_CB { get; set; }
     }
 }

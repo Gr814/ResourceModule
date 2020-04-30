@@ -5,7 +5,7 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using UnityEngine;
-using Object = System.Object;
+using Object = UnityEngine.Object;
 
 public class ABAssetLoader : AssetLoader
 {

@@ -4,19 +4,23 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using UnityEngine;
+using Object = UnityEngine.Object;
 
-public class RawAssetLoader : IAssetLoader
+public class RawAssetLoader : AssetLoader
 {
-    public Action<object> OnLoadFinish { get; set; }
+    public RawAssetLoader(Action<string, Object> load_fininsh_callback, Action<IEnumerator> start_coroutine) : base(load_fininsh_callback, start_coroutine)
+    {
+    }
 
-    public void LoadAsset(string path, bool async = true)
+    public override void LoadAsset(string path, bool async = true)
     {
         if (async)
         {
+            StartCoroutine(LoadAsync(path));
         }
         else
         {
-            OnLoadFinish.Invoke(Resources.Load(path));
+            OnLoadFinish.Invoke(path, Resources.Load(path));
         }
     }
 
@@ -24,6 +28,6 @@ public class RawAssetLoader : IAssetLoader
     {
         var request = Resources.LoadAsync(path);
         yield return request;
-        OnLoadFinish.Invoke(request.asset);
+        OnLoadFinish.Invoke(path, request.asset);
     }
 }

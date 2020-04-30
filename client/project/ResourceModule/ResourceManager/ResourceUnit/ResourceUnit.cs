@@ -6,7 +6,7 @@ using Object = UnityEngine.Object;
 
 public  class ResourceUnit
 {
-    public bool IsDone { get; private set; }
+    public EResourceUnitStatus status { get; private set; }
 
     public int RefCounter { get; private set; }
 
@@ -21,6 +21,7 @@ public  class ResourceUnit
         {
             depend_units[i].Ref();
         }
+        status = EResourceUnitStatus.Loading;
     }
 
     public T GetObject<T>() where T: Object
@@ -42,6 +43,12 @@ public  class ResourceUnit
         RefCounter++;
         cpt.SetBreakCallBack(BreakLink);
         return obj;
+    }
+
+    public void Finish(Object asset)
+    {
+        m_asset = asset;
+        status = EResourceUnitStatus.Done;
     }
 
     public void BreakLink()
@@ -66,8 +73,15 @@ public  class ResourceUnit
         }
 
         Resources.UnloadAsset(m_asset);
-        IsDone = false;
+        status = EResourceUnitStatus.Unload;
         m_asset = null;
         depend_units = null;
     }
+}
+
+public enum EResourceUnitStatus
+{
+    Done,// 完成
+    Loading,//加载中
+    Unload,//卸载
 }
