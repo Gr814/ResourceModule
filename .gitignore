@@ -1,5 +1,6 @@
 client/project/ResourceModule/.vs/
 client/project/ResourceModule/ProjectSettings/
 client/project/ResourceModule/ResourceModule/
+client/project/ResourceModule/ResourceManager/obj/
 client/project/ResourceModule/Library/
 !.gitignore
